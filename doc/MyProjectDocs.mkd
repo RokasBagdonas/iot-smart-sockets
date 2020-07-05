@@ -1,0 +1,99 @@
+MyProjectDocs.mkd: COM3505 project documentation
+===
+## State Machine Diagram
+
+### Start-up / Loop State Diagram
+![Start-Up / Loop State Diagram](startup-loop-states.png "Start-up / Loop State Diagram")
+
+
+
+
+## User Guide
+### Setup 
+To Setup the device, turn it on using the power switch located at the bottom of the device (assuming you have already flashed the software). This will start the device. In the event you have not flashed the software onto the device, navigate to `myprojectthing`, and type `make flash` (you must already have set your IDF and PATH variables).
+
+Once the device starts, it will first try to connect to the last network, if the device connects to the previous network, skip this step. However, if the device does not find and/or connect to the previous network and a timeout occurs, the device will launch its own access point. In this event, please connect to the access point using a laptop/computer/phone/tablet/etc, the name will be `Iot-Sockets-XXXXXXXX` where `XXXXXXXX` is the MAC address of your device. The default password is `password` but of course you can change this in the `private.h` file. Once connected to the access point, you can view wifi settings and connect to a network. Select your network and input the password, the device will then try to connect to the new network. 
+
+Once connected to a network, the device will launch its own web server on the network. The exact address of this will differ based on network, but will be displayed on the UnPhone display. Navigating to this web address will direct you to the home page. This page shows controls for both sockets, as well as a link to the wifi settings of the device, and a link to the telegram settings. 
+
+### Usage 
+To turn a socket on or off, select the corresponding button on the home page. If you want to turn both sockets on or off at the same time, select the option `all sockets`. 
+
+`Wifi Settings` allows you to see wifi status and/or change access point/network. 
+
+`Telegram Settings` allows you to see the current telegram API key and change it to a new key if required. This allows the user to change the API key on a device without needing to change the `private.h` file and reflash the device. This is useful for distributing the device as it allows users to change the API key to their own bot. If the user inputs a valid API key into the form, the device will update the key for the bot and check for a response from the telegram API. If a success response is received, the key will update. If the user inputs an invalid API key, then the device will attempt to update the key, get an invalid response from the telgram API and reset the key to the one stored in `private.h`.
+
+Allowing the user to change the API key means that the user has control of their API bot, which increases the security of the device. This prevents multiple people from being forced to use the same bot. An additional security feature which could be easily implemented is to have a password which must be entered before any command or changing the API key,  this would further improve the security of the system and prevent unauthorised access.
+
+The device contains some information on the LCD screen to assist the user including a warning about processing delay (due to the API). The user can use the buttons on the unPhone to turn the selected switch on or off, and use the third button to navigate switches. 
+
+## Telegram API bot 
+Our solution provides functionality for toggling smart socket plugs using Telegram API bot. This works by creating your own Telegram Bot and assigning its authentication token to the _BOT_API_KEY in private.h. To use it, type in appropriate command in the bot chat, or if you have a group chat with bot included, add **/** prefix. 
+
+## Commands
+In our program, we have implemented a functionallity of directly toggling any switch on or off, provided a command is of format: **/{4 digit socket code}\_{1 digit socket index}{ON|OFF}**.
+Example: **/1401\_2ON**.
+This format is valid for every switch, from 1401 to 1408. 
+
+# Additional commands
+**/options** - For improving user experience and instead of typing the the socket code every time, we have added this command so that it returns a custom Telegram API keyboard that sends the socket code for you. It also displays commands  **/OURS\_ON|OFF**. 
+
+**/OURS\_ON|OFF** - toggles all the sockets within the range. At this stage we impemented this for our own 1401\_2 and 1408\_3 sockets. 
+
+![Telegram Keyboard options](keyboard-options.png "keyboard options")
+
+## Implementation 
+The initial challenge in implementing Telegram Bot API was to decide how the updates in Telegram would be received by the unPhone. We decided to take a look at two solutions: using WebHooks to send HTTP requests directly to the unPhone and unPhone constantly polling the Telegram Bot API for updates.
+
+At first we looked at using WebHooks via IFTTT, where an event would be triggered on particular keywords whenever user types anything in their Telegram chat. From there, an HTTP request would be sent to a particular URL address with the keyword included. Finally, unPhone would verify the keyword and perfom an action accordingly. The problem was that we would need to have a domain accessible via Internet for each unPhone, which is not feasible for multiple IoT devices. That would also cause additional security issues, where anyone could send requests and see the device.
+
+Because of the problems listed above, we decided to go with polling solution. Given a Telegram Bot API access token, we used Telegram Bot API library [UniversalTelegramBot](https://github.com/witnessmenow/Universal-Arduino-Telegram-Bot) to call getUpdates(bot.last_message_received + 1) method every 2 seconds. For each new message received, our program checks the content of it - if it matches a predefined String command, an appropriate method will be called to toggle a switch and respond if the command was received.
+
+## Battery and energy usage
+As our solution is meant to be used indoors for stationary power sockets, we are expecting that the users will position the unPhone in the same place with a constant power supply. Because of that, optimisations towards reducing the energy consumption wasn't the primarly focus, as it would create unnecessary difficulties in using the device where users would be prompted to recharge the unPhone from time to time, instead of plugging it in and positioning in a wide coverage area.
+
+The device still functions without the constant power supply thanks to the installed battery. The radio transmitter is running on 3.3V, so it uses less power if there is a need to use the unPhone unplugged for longer periods of time.
+
+## Provisioning and OTA Updates
+The current implementation does not automatically do OTA updates while running; OTA updating only occurs if the device is connected to a WiFi network and has an internet connection. However, the device checks the current firmware version number against the version number on gitlab each time it is reset; if they match then no action takes place. If they do not match, then the device will download the new firmware from gitlab and install it. The device will then reset itself to run the new firmware. This allows the device to be updated remotely to patch any security vulnerabilities. 
+
+## Testing
+### Website testing
+| Test                                                                                    | Expected Outcome                                                                               | Actual Outcome                                                                                | Correct Result? |
+|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|-----------------|
+| On the root page '/', \n Click 'on' next to 'socket 1408 3'                                | The unPhone should transmit a radio signal and turn socket 1408 3 on                           | The unPhone correctly sends the radio signal and socket 1408 3 turns on                       | Yes             |
+| On the root page '/', Click 'off' next to 'socket 1408 3'                               | The unPhone should transmit a radio signal and turn socket 1408 3 off                          | The unPhone correctly sends the radio signal and socket 1408 3 turns off                      | Yes             |
+| On the root page '/', Click 'on' next to 'socket 1401 2'                                | The unPhone should transmit a radio signal and turn socket 1401 2 on                           | The unPhone correctly sends the radio signal and socket 1401 2 turns on                       | Yes             |
+| On the root page '/', Click 'off' next to 'socket 1401 2'                               | The unPhone should transmit a radio signal and turn socket 1401 2 off                          | The unPhone correctly sends the radio signal and socket 1401 2 turns off                      | Yes             |
+| On the root page '/', Click 'on' next to 'all sockets'                                  | The unPhone should transmit two radio signals and turn sockets 1408 3 and 1401 2 on            | The unPhone correctly sends the radio signals and sockets 1408 3 and 1401 2 turn on           | Yes             |
+| On the root page '/', Click 'off' next to 'all sockets'                                 | The unPhone should transmit two radio signals and turn sockets 1408 3 and 1401 2 off           | The unPhone correctly sends the radio signals and sockets 1408 3 and 1401 2 turn off          | Yes             |
+| On root page '/', Click 'wifi settings'                                                 | The webpage should direct to the wifi settings page, options to view status and change network | The webpage directs to the wifi settings page, with options to view status and change network | Yes             |
+| On root page '/',  Click 'telegram bot settings'                                                     | User should be directed to telegram settings page '/telegram_config'                                                       | User is directed to telegram settings page '/telegram_config'                                                             | Yes             |
+| On the telegram settings page '/telegram_config',  Click 'home'                                                     | User should be directed to root page '/'                                                       | User is directed to root page '/'                                                             | Yes             |
+| On the telegram page '/telegram_config', input valid API key                                                    | User should be directed to telegram change page '/telegram_change', should see 'key changed...', key should be updated and displated                                                    | User is directed to telegram change page page '/telegram_change', and can see message 'key changed...', key is updated and displayed                                                            | Yes             |
+| On the telegram page '/telegram_config', input invalid API key                                                    | User should be directed to telegram change page '/telegram_change', should see 'invalid key, key reset...', key should be reset to key stored in `private.h` and displayed to user.                                                      | User is directed to telegram change page page '/telegram_change', and can see message 'invalid key. key reset...', key is reset to key stored in `private.h` and displated to user                                                         | Yes             |
+| On Wifi page '/wifi',  Click 'wifi access point'                                        | The user should be directed to the access points page with the option to change wifi network   | The user is directed to the access point page, they can select a new network.                 | Yes             |
+| On the access point page '/wificonfig', choose new access point with incorrect password | The unPhone will not connect to the new network                                                | The UnPhone does not connect to the new network                                               | Yes             |
+| On the access point page '/wificonfig', choose new access point with correct password   | The UnPhone will connect to the new network                                                    | The UnPhone connects to the new network                                                       | Yes             |
+| On the WiFi page '/wifi',  click 'wifi status'.                                         | User will be directed to wifi status page                                                      | User is directed to wifi status page                                                          | Yes             |
+| On Wifi page '/wifi',  Click 'home'                                                     | User should be directed to root page '/'                                                       | User is directed to root page '/'                                                             | Yes             |
+
+
+### Telegram testing
+| Test                                                                                    | Expected Outcome                                                                               | Actual Outcome                                                                                | Correct Result? |
+|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|-----------------|
+| When on the Telegram Bot, command **1401_2ON** turns on the switch                                | The unPhone should read the message and call a method plug2On() that turns on the 1401 2 switch                       | The unPhone correctly sends the radio signal and socket 1401 2 turns on                       | Yes             |
+| When on the Telegram Bot, command **1401_2OFF** turns on the switch                                | The unPhone should read the message and call a method plug2Off() that turns off the 1401 2 switch                       | The unPhone correctly sends the radio signal and socket 1401 2 turns off                       | Yes             |
+| When on the Telegram Bot, command **1408_3ON** turns on the switch                                | The unPhone should read the message and call a method plug2On() that turns on the 1408 3 switch                       | The unPhone correctly sends the radio signal and socket 1408 3 turns on                       | Yes             |
+| When on the Telegram Bot, command **1408_3OFF** turns on the switch                                | The unPhone should read the message and call a method plug2Off() that turns off the 1408 3 switch                       | The unPhone correctly sends the radio signal and socket 1408 3 turns off                       | Yes             |
+| When on the Telegram Bot, command **OURS_ON** turns on 1402_2 and 1408_3 switches                                | The unPhone should read the message and call a method toggleOurs(true) and send an ON signal for 1401_2 and 1408_3 sockets                        | The unPhone correctly sends the radio signals  and sockets 1401_2 and 1408_3 turn on.                       | Yes             |
+| When on the Telegram Bot, command **OURS_OFF** turns off 1402_2 and 1408_3 switches                                | The unPhone should read the message and call a method toggleOurs(false) and send an OFF signal for 1401_2 and 1408_3 sockets                        | The unPhone correctly sends the radio signals  and sockets 1401_2 and 1408_3 turn off.                       | Yes             |
+
+
+### Bugs 
+There is a bug in the WifiChz function which means that the unPhone cannot connect to any network with `'` apostrophes or `"` quote marks in the name. These symbols are acceptable for network names but a bug in the unPhone means it cannot connect. Originally, we thought this may be because the access point name was escaped in apostrophes, but even changing it to quote marks still led to errors when trying to connect to an access point with an apostrophe in the name. The easiest solution for this given the timescale was to simply change the access point name to remove the offending punctuation.
+
+There is also a bug where if the unPhone attempts to send an ssl request and waits for a response during a network outage (including a millisecond long one), the device will panic and reset itself - this is network related and not actually a bug in the device or firmware.
+
+## Function Details
+For information about functions see comments above each function in respective files.
