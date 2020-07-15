@@ -1,12 +1,7 @@
-MyProjectDocs.mkd: COM3505 project documentation
-===
-## State Machine Diagram
+A University of Sheffield _The Internet of Things_ project done together with [Luke Peacock](https://github.com/LukePeacock).
 
-### Start-up / Loop State Diagram
-![Start-Up / Loop State Diagram](./doc/startup-loop-states.png "Start-up / Loop State Diagram")
-
-
-
+## What is it about?
+We developed firmware for turning on and off smart socket plugs remotely using a radio transmitter. The app can be either used via a server hosted on the device or via a Telegram Bot API (refer to further sections for more details). The firmware was developed using [an unPhone](https://gitlab.com/hamishcunningham/unphone) (a custom built gizmo that uses an ESP32 chip).  
 
 ## User Guide
 ### Setup 
@@ -94,6 +89,11 @@ The current implementation does not automatically do OTA updates while running; 
 There is a bug in the WifiChz function which means that the unPhone cannot connect to any network with `'` apostrophes or `"` quote marks in the name. These symbols are acceptable for network names but a bug in the unPhone means it cannot connect. Originally, we thought this may be because the access point name was escaped in apostrophes, but even changing it to quote marks still led to errors when trying to connect to an access point with an apostrophe in the name. The easiest solution for this given the timescale was to simply change the access point name to remove the offending punctuation.
 
 There is also a bug where if the unPhone attempts to send an ssl request and waits for a response during a network outage (including a millisecond long one), the device will panic and reset itself - this is network related and not actually a bug in the device or firmware.
+
+## State Machine Diagram
+
+### Start-up / Loop State Diagram
+![Start-Up / Loop State Diagram](./doc/startup-loop-states.png "Start-up / Loop State Diagram")
 
 ## Function Details
 For information about functions see comments above each function in respective files.
